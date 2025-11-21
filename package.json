@@ -1,0 +1,23 @@
+{
+  "name": "eiasw",
+  "version": "0.1.0",
+  "description": "Everything Is A Service Worker - Persistent daemon architecture inspired by Plan9 file servers",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/index.js"
+  },
+  "keywords": [
+    "service-worker",
+    "daemon",
+    "plan9",
+    "persistent",
+    "microservices"
+  ],
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
