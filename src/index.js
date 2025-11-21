@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { randomUUID } from 'crypto';
 
 /**
  * ServiceWorker - A persistent daemon process inspired by Plan9 file servers
@@ -18,7 +19,7 @@ export class ServiceWorker extends EventEmitter {
     this.state = 'stopped';
     this.context = {};
     this.messageQueue = [];
-    this.processInterval = null;
+    this.processing = false;
   }
 
   /**
@@ -40,9 +41,6 @@ export class ServiceWorker extends EventEmitter {
       this.state = 'running';
       this.emit('started', { name: this.name });
       
-      // Start message processing loop
-      this.processInterval = setInterval(() => this._processMessages(), 10);
-      
       return true;
     } catch (error) {
       this.state = 'error';
@@ -63,11 +61,6 @@ export class ServiceWorker extends EventEmitter {
     this.emit('stopping', { name: this.name });
 
     try {
-      if (this.processInterval) {
-        clearInterval(this.processInterval);
-        this.processInterval = null;
-      }
-
       if (this.handler.onStop) {
         await this.handler.onStop(this.context);
       }
@@ -102,7 +95,7 @@ export class ServiceWorker extends EventEmitter {
     }
 
     return new Promise((resolve, reject) => {
-      const messageId = Date.now() + Math.random();
+      const messageId = randomUUID();
       
       this.messageQueue.push({
         id: messageId,
@@ -111,6 +104,9 @@ export class ServiceWorker extends EventEmitter {
         reject,
         timestamp: Date.now()
       });
+      
+      // Trigger immediate processing
+      this._processMessages();
     });
   }
 
@@ -119,17 +115,26 @@ export class ServiceWorker extends EventEmitter {
    * @private
    */
   async _processMessages() {
-    if (this.messageQueue.length === 0 || !this.handler.onMessage) {
+    if (this.processing || this.messageQueue.length === 0 || !this.handler.onMessage) {
       return;
     }
 
-    const item = this.messageQueue.shift();
-    
+    this.processing = true;
+
     try {
-      const response = await this.handler.onMessage(item.message, this.context);
-      item.resolve(response);
-    } catch (error) {
-      item.reject(error);
+      // Process all queued messages
+      while (this.messageQueue.length > 0) {
+        const item = this.messageQueue.shift();
+        
+        try {
+          const response = await this.handler.onMessage(item.message, this.context);
+          item.resolve(response);
+        } catch (error) {
+          item.reject(error);
+        }
+      }
+    } finally {
+      this.processing = false;
     }
   }
 
